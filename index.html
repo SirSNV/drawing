@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Перспектива для художника: точки схода + архитектура</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #151c34;
+      --ink: #e9eefb;
+      --vp1: #7dd3fc;
+      --vp2: #a78bfa;
+      --vp3: #fb7185;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 20% 0%, #18254d, var(--bg) 55%);
+    }
+    .panel {
+      max-height: 100vh;
+      overflow: auto;
+      border-right: 1px solid #32406f;
+      background: linear-gradient(180deg, #1a2345, var(--panel));
+      padding: 16px;
+    }
+    h1 { margin: 0 0 10px; font-size: 1.15rem; }
+    p { margin: 8px 0; opacity: 0.92; }
+    .group {
+      margin: 12px 0;
+      border: 1px solid #354576;
+      border-radius: 10px;
+      background: #10172d;
+      padding: 10px;
+    }
+    .group h2 { margin: 0 0 8px; font-size: 0.92rem; color: #c6d6ff; }
+    .control {
+      margin: 8px 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      align-items: center;
+      font-size: 0.88rem;
+    }
+    .control input, .control select { grid-column: 1 / -1; width: 100%; }
+    .checks { display: grid; gap: 7px; font-size: 0.88rem; }
+    canvas {
+      width: 100%;
+      height: 100vh;
+      display: block;
+      cursor: grab;
+      background: linear-gradient(180deg, #212d59 0%, #141d3b 62%, #10152b 100%);
+    }
+    .kbd {
+      display: inline-block;
+      border: 1px solid #4a5f9e;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      background: #18244b;
+    }
+  </style>
+</head>
+<body>
+  <aside class="panel">
+    <h1>Интерактивная перспектива для начинающего художника</h1>
+    <p>Крути параметры, двигай точки схода мышкой и смотри, как строится объём и архитектура.</p>
+    <p><span class="kbd">ЛКМ + drag</span> — перетаскивание VP.</p>
+
+    <div class="group">
+      <h2>Быстрый сценарий</h2>
+      <div class="control">
+        <label for="preset">Пресет урока</label>
+        <select id="preset">
+          <option value="free">Свободный режим</option>
+          <option value="temple">Храм (1-точечная)</option>
+          <option value="street">Улица (2-точечная)</option>
+          <option value="dramatic">Драматичный ракурс (3-точечная)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Перспектива</h2>
+      <div class="control">
+        <label for="mode">Количество точек схода</label>
+        <span id="modeValue"></span>
+        <input id="mode" type="range" min="1" max="3" value="2" step="1" />
+      </div>
+      <div class="control">
+        <label for="horizon">Высота горизонта</label>
+        <span id="horizonValue"></span>
+        <input id="horizon" type="range" min="70" max="900" value="360" />
+      </div>
+      <div class="control">
+        <label for="eyeHeight">Смещение объекта по вертикали</label>
+        <span id="eyeHeightValue"></span>
+        <input id="eyeHeight" type="range" min="-240" max="240" value="0" />
+      </div>
+      <div class="control">
+        <label for="depth">Глубина объёма</label>
+        <span id="depthValue"></span>
+        <input id="depth" type="range" min="0.12" max="0.9" step="0.01" value="0.48" />
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Точки схода</h2>
+      <div class="control">
+        <label for="vp1x">VP1 X</label><span id="vp1xValue"></span>
+        <input id="vp1x" type="range" min="-1000" max="3000" value="80" />
+      </div>
+      <div class="control">
+        <label for="vp2x">VP2 X</label><span id="vp2xValue"></span>
+        <input id="vp2x" type="range" min="-1000" max="3000" value="1500" />
+      </div>
+      <div class="control">
+        <label for="vp3y">VP3 Y</label><span id="vp3yValue"></span>
+        <input id="vp3y" type="range" min="-1300" max="1900" value="-520" />
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Архитектурный тренажёр</h2>
+      <div class="control">
+        <label for="columns">Колонн на фасаде</label><span id="columnsValue"></span>
+        <input id="columns" type="range" min="4" max="12" value="6" />
+      </div>
+      <div class="control">
+        <label for="steps">Ступеней стилобата</label><span id="stepsValue"></span>
+        <input id="steps" type="range" min="2" max="8" value="4" />
+      </div>
+      <div class="control">
+        <label for="roof">Высота фронтона</label><span id="roofValue"></span>
+        <input id="roof" type="range" min="0.1" max="0.45" step="0.01" value="0.24" />
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Отображение</h2>
+      <div class="checks">
+        <label><input id="showGrid" type="checkbox" checked /> Сетка и лучи</label>
+        <label><input id="showTemple" type="checkbox" checked /> Архитектурная надстройка (храм)</label>
+        <label><input id="showStreet" type="checkbox" checked /> Улица из боксов</label>
+        <label><input id="showTips" type="checkbox" checked /> Обучающие подсказки</label>
+      </div>
+    </div>
+  </aside>
+
+  <canvas id="scene"></canvas>
+
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+
+    const controls = Object.fromEntries([...document.querySelectorAll('input, select')].map(el => [el.id, el]));
+    const labels = {
+      modeValue: document.getElementById('modeValue'),
+      horizonValue: document.getElementById('horizonValue'),
+      eyeHeightValue: document.getElementById('eyeHeightValue'),
+      depthValue: document.getElementById('depthValue'),
+      vp1xValue: document.getElementById('vp1xValue'),
+      vp2xValue: document.getElementById('vp2xValue'),
+      vp3yValue: document.getElementById('vp3yValue'),
+      columnsValue: document.getElementById('columnsValue'),
+      stepsValue: document.getElementById('stepsValue'),
+      roofValue: document.getElementById('roofValue')
+    };
+
+    const state = {
+      vp1: { x: 80, y: 360, color: '#7dd3fc', name: 'VP1' },
+      vp2: { x: 1500, y: 360, color: '#a78bfa', name: 'VP2' },
+      vp3: { x: 760, y: -520, color: '#fb7185', name: 'VP3' },
+      dragging: null
+    };
+
+    const P = (x, y) => ({ x, y });
+    const lerp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+
+    function lineIntersection(a, b, c, d) {
+      const den = (a.x - b.x) * (c.y - d.y) - (a.y - b.y) * (c.x - d.x);
+      if (Math.abs(den) < 1e-7) return null;
+      const px = ((a.x * b.y - a.y * b.x) * (c.x - d.x) - (a.x - b.x) * (c.x * d.y - c.y * d.x)) / den;
+      const py = ((a.x * b.y - a.y * b.x) * (c.y - d.y) - (a.y - b.y) * (c.x * d.y - c.y * d.x)) / den;
+      return P(px, py);
+    }
+
+    function drawLine(a, b, color, width = 1, alpha = 1, dash = []) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.globalAlpha = alpha;
+      ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawPoint(p, color, text) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.fillText(text, p.x + 10, p.y - 10);
+      ctx.restore();
+    }
+
+    function drawPoly(points, color, width = 2, alpha = 1, closed = true) {
+      if (points.length < 2) return;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      if (closed) ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawGrid(mode) {
+      if (!controls.showGrid.checked) return;
+      const horizon = Number(controls.horizon.value);
+      drawLine(P(0, horizon), P(canvas.clientWidth, horizon), '#8ca3df', 2, 0.5, [10, 8]);
+
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.strokeStyle = '#506395';
+      for (let y = horizon - 280; y <= horizon + 320; y += 28) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.clientWidth, y); ctx.stroke();
+      }
+      ctx.restore();
+
+      const anchor = P(canvas.clientWidth * 0.5, horizon + 140);
+      for (let i = -11; i <= 11; i++) {
+        const base = P(anchor.x + i * 40, anchor.y);
+        drawLine(base, state.vp1, '#7dd3fc', 1, 0.18);
+        if (mode >= 2) drawLine(base, state.vp2, '#a78bfa', 1, 0.18);
+      }
+    }
+
+    function makeOnePointBox() {
+      const cx = canvas.clientWidth * 0.5;
+      const cy = Number(controls.horizon.value) + Number(controls.eyeHeight.value);
+      const w = 270;
+      const h = 220;
+      const tl = P(cx - w / 2, cy - h / 2);
+      const tr = P(cx + w / 2, cy - h / 2);
+      const br = P(cx + w / 2, cy + h / 2);
+      const bl = P(cx - w / 2, cy + h / 2);
+      const d = Number(controls.depth.value);
+      const btl = lerp(tl, state.vp1, d);
+      const btr = lerp(tr, state.vp1, d);
+      const bbr = lerp(br, state.vp1, d);
+      const bbl = lerp(bl, state.vp1, d);
+      return { mode: 1, front: { tl, tr, br, bl }, back: { tl: btl, tr: btr, br: bbr, bl: bbl } };
+    }
+
+    function makeTwoThreePointBox(mode) {
+      const c = P(canvas.clientWidth * 0.5, Number(controls.horizon.value) + Number(controls.eyeHeight.value));
+      const h = 190;
+      const fTop = mode === 3 ? lerp(c, state.vp3, 0.27) : P(c.x, c.y - h / 2);
+      const fBot = mode === 3 ? lerp(c, state.vp3, -0.27) : P(c.x, c.y + h / 2);
+      const d = Number(controls.depth.value);
+
+      const rightTop = lerp(fTop, state.vp1, d);
+      const leftTop = lerp(fTop, state.vp2, d);
+      const rightBot = lerp(fBot, state.vp1, d);
+      const leftBot = lerp(fBot, state.vp2, d);
+      const backTop = lineIntersection(rightTop, state.vp2, leftTop, state.vp1);
+      const backBot = lineIntersection(rightBot, state.vp2, leftBot, state.vp1);
+      return { mode, c, fTop, fBot, rightTop, leftTop, rightBot, leftBot, backTop, backBot };
+    }
+
+    function drawOnePointBox(box) {
+      const { front, back } = box;
+      drawPoly([front.tl, front.tr, front.br, front.bl], '#fb7185', 2.2, 1, true);
+      drawPoly([back.tl, back.tr, back.br, back.bl], '#9fb2e9', 1.8, 0.85, true);
+      drawLine(front.tl, back.tl, '#7dd3fc', 2);
+      drawLine(front.tr, back.tr, '#7dd3fc', 2);
+      drawLine(front.br, back.br, '#7dd3fc', 2);
+      drawLine(front.bl, back.bl, '#7dd3fc', 2);
+    }
+
+    function drawTwoThreePointBox(box) {
+      drawLine(box.fTop, box.rightTop, '#7dd3fc', 2.1);
+      drawLine(box.fTop, box.leftTop, '#a78bfa', 2.1);
+      drawLine(box.fBot, box.rightBot, '#7dd3fc', 2.1);
+      drawLine(box.fBot, box.leftBot, '#a78bfa', 2.1);
+      drawLine(box.rightTop, box.backTop, '#a78bfa', 2.1);
+      drawLine(box.leftTop, box.backTop, '#7dd3fc', 2.1);
+      drawLine(box.rightBot, box.backBot, '#a78bfa', 2.1);
+      drawLine(box.leftBot, box.backBot, '#7dd3fc', 2.1);
+      drawLine(box.fTop, box.fBot, '#fb7185', 2.3);
+      drawLine(box.rightTop, box.rightBot, '#fb7185', 2);
+      drawLine(box.leftTop, box.leftBot, '#fb7185', 2);
+      drawLine(box.backTop, box.backBot, '#fb7185', 2);
+
+      if (controls.showGrid.checked) {
+        const rays = [box.fTop, box.fBot, box.rightTop, box.leftTop, box.rightBot, box.leftBot, box.backTop, box.backBot];
+        for (const p of rays) {
+          drawLine(p, state.vp1, '#7dd3fc', 1, 0.2);
+          drawLine(p, state.vp2, '#a78bfa', 1, 0.2);
+          if (box.mode === 3) drawLine(p, state.vp3, '#fb7185', 1, 0.2);
+        }
+      }
+    }
+
+    function drawTempleOverlay(frontRect) {
+      if (!controls.showTemple.checked) return;
+      const { tl, tr, br, bl } = frontRect;
+      const steps = Number(controls.steps.value);
+      const columns = Number(controls.columns.value);
+      const roof = Number(controls.roof.value);
+
+      // Ступени
+      for (let i = 0; i < steps; i++) {
+        const t = i / (steps + 1);
+        const inset = 0.03 + t * 0.07;
+        const yShift = i * 8;
+        const sTl = P(tl.x + (tr.x - tl.x) * inset, tl.y + (bl.y - tl.y) * 0.73 + yShift);
+        const sTr = P(tr.x - (tr.x - tl.x) * inset, tr.y + (br.y - tr.y) * 0.73 + yShift);
+        const sBr = P(sTr.x, sTr.y + 14);
+        const sBl = P(sTl.x, sTl.y + 14);
+        drawPoly([sTl, sTr, sBr, sBl], '#8fb0ff', 1.2, 0.85, true);
+        drawLine(sTr, lerp(sTr, state.vp1, Number(controls.depth.value) * 0.35), '#7dd3fc', 1, 0.45);
+        drawLine(sTl, lerp(sTl, state.vp1, Number(controls.depth.value) * 0.35), '#7dd3fc', 1, 0.45);
+      }
+
+      // Площадка колоннады
+      const baseY = tl.y + (bl.y - tl.y) * 0.68;
+      const topY = tl.y + (bl.y - tl.y) * 0.2;
+      const left = tl.x + (tr.x - tl.x) * 0.09;
+      const right = tr.x - (tr.x - tl.x) * 0.09;
+      drawPoly([P(left, topY), P(right, topY), P(right, baseY), P(left, baseY)], '#f2d6aa', 1.4, 0.75, true);
+
+      // Колонны
+      for (let i = 0; i < columns; i++) {
+        const t = columns === 1 ? 0.5 : i / (columns - 1);
+        const x = left + (right - left) * t;
+        const shaftW = Math.max(5, (right - left) * 0.012);
+        drawPoly([P(x - shaftW, topY), P(x + shaftW, topY), P(x + shaftW, baseY), P(x - shaftW, baseY)], '#f8e7cc', 1.2, 0.9, true);
+        drawLine(P(x, topY), lerp(P(x, topY), state.vp1, Number(controls.depth.value) * 0.25), '#7dd3fc', 1, 0.35);
+      }
+
+      // Антаблемент и фронтон
+      const entTop = topY - 20;
+      drawPoly([P(left - 10, entTop), P(right + 10, entTop), P(right + 10, topY), P(left - 10, topY)], '#f4d3a0', 1.6, 0.9, true);
+      const peak = P((left + right) * 0.5, entTop - (baseY - topY) * roof);
+      drawPoly([P(left - 12, entTop), peak, P(right + 12, entTop)], '#ffd8a7', 1.7, 0.95, true);
+
+      // Глубина крыши к VP1
+      const roofA = P(left - 12, entTop);
+      const roofB = P(right + 12, entTop);
+      drawLine(roofA, lerp(roofA, state.vp1, Number(controls.depth.value) * 0.3), '#7dd3fc', 1.2, 0.45);
+      drawLine(roofB, lerp(roofB, state.vp1, Number(controls.depth.value) * 0.3), '#7dd3fc', 1.2, 0.45);
+    }
+
+    function drawStreetMode() {
+      if (!controls.showStreet.checked) return;
+      const horizon = Number(controls.horizon.value);
+      const centerY = horizon + 110;
+      const centerX = canvas.clientWidth * 0.5;
+
+      for (let i = 0; i < 5; i++) {
+        const s = 0.18 + i * 0.12;
+        const leftAnchor = P(centerX - 520 + i * 75, centerY + i * 18);
+        const rightAnchor = P(centerX + 520 - i * 75, centerY + i * 18);
+
+        const lt = P(leftAnchor.x, leftAnchor.y - 140 + i * 10);
+        const lb = P(leftAnchor.x, leftAnchor.y + 80 + i * 12);
+        const rt = P(rightAnchor.x, rightAnchor.y - 140 + i * 10);
+        const rb = P(rightAnchor.x, rightAnchor.y + 80 + i * 12);
+
+        drawLine(lt, lerp(lt, state.vp2, s), '#a78bfa', 1.2, 0.35);
+        drawLine(lb, lerp(lb, state.vp2, s), '#a78bfa', 1.2, 0.35);
+        drawLine(rt, lerp(rt, state.vp1, s), '#7dd3fc', 1.2, 0.35);
+        drawLine(rb, lerp(rb, state.vp1, s), '#7dd3fc', 1.2, 0.35);
+
+        drawLine(lt, lb, '#fb7185', 1.4, 0.45);
+        drawLine(rt, rb, '#fb7185', 1.4, 0.45);
+      }
+    }
+
+    function applyPreset(name) {
+      if (name === 'temple') {
+        controls.mode.value = 1;
+        controls.horizon.value = 360;
+        controls.eyeHeight.value = 10;
+        controls.depth.value = 0.42;
+        controls.vp1x.value = Math.round(canvas.clientWidth * 0.5);
+        controls.showTemple.checked = true;
+        controls.showStreet.checked = false;
+      } else if (name === 'street') {
+        controls.mode.value = 2;
+        controls.horizon.value = 370;
+        controls.eyeHeight.value = 0;
+        controls.depth.value = 0.58;
+        controls.vp1x.value = 120;
+        controls.vp2x.value = 1480;
+        controls.showStreet.checked = true;
+      } else if (name === 'dramatic') {
+        controls.mode.value = 3;
+        controls.horizon.value = 380;
+        controls.eyeHeight.value = -30;
+        controls.depth.value = 0.62;
+        controls.vp1x.value = 200;
+        controls.vp2x.value = 1400;
+        controls.vp3y.value = -800;
+        controls.showStreet.checked = true;
+        controls.showTemple.checked = false;
+      }
+      draw();
+    }
+
+    function drawTips(mode) {
+      if (!controls.showTips.checked) return;
+      ctx.save();
+      ctx.fillStyle = '#d8e5ff';
+      ctx.globalAlpha = 0.92;
+      ctx.font = '14px Inter, sans-serif';
+      const dist = Math.abs(state.vp2.x - state.vp1.x);
+      let msg = 'Нормальное искажение для учебной сцены';
+      if (dist < 650 && mode >= 2) msg = 'Точки схода близко: сильный wide-angle эффект';
+      if (dist > 1900 && mode >= 2) msg = 'Точки схода далеко: спокойная академическая перспектива';
+      ctx.fillText(`Режим: ${mode}-точечная перспектива`, 18, 28);
+      ctx.fillText(msg, 18, 50);
+      ctx.fillText('Горизонт = уровень глаз наблюдателя', 18, 72);
+      if (mode === 1) ctx.fillText('Для храмов тренируй 1-точечную, потом переходи в 2-точечную.', 18, 94);
+      if (mode === 3) ctx.fillText('VP3 управляет завалом вертикалей — эффект "снизу вверх".', 18, 94);
+      ctx.restore();
+    }
+
+    function updateLabels() {
+      labels.modeValue.textContent = controls.mode.value;
+      labels.horizonValue.textContent = `${controls.horizon.value}px`;
+      labels.eyeHeightValue.textContent = `${controls.eyeHeight.value}px`;
+      labels.depthValue.textContent = controls.depth.value;
+      labels.vp1xValue.textContent = `${controls.vp1x.value}px`;
+      labels.vp2xValue.textContent = `${controls.vp2x.value}px`;
+      labels.vp3yValue.textContent = `${controls.vp3y.value}px`;
+      labels.columnsValue.textContent = controls.columns.value;
+      labels.stepsValue.textContent = controls.steps.value;
+      labels.roofValue.textContent = controls.roof.value;
+    }
+
+    function draw() {
+      const mode = Number(controls.mode.value);
+      ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+      state.vp1.x = Number(controls.vp1x.value);
+      state.vp2.x = Number(controls.vp2x.value);
+      state.vp1.y = Number(controls.horizon.value);
+      state.vp2.y = Number(controls.horizon.value);
+      state.vp3.x = canvas.clientWidth * 0.5;
+      state.vp3.y = Number(controls.vp3y.value);
+
+      drawGrid(mode);
+      if (mode >= 2) drawStreetMode();
+
+      if (mode === 1) {
+        const box = makeOnePointBox();
+        drawOnePointBox(box);
+        drawTempleOverlay(box.front);
+      } else {
+        const box = makeTwoThreePointBox(mode);
+        drawTwoThreePointBox(box);
+      }
+
+      drawPoint(state.vp1, state.vp1.color, 'VP1');
+      if (mode >= 2) drawPoint(state.vp2, state.vp2.color, 'VP2');
+      if (mode === 3) drawPoint(state.vp3, state.vp3.color, 'VP3');
+
+      drawTips(mode);
+      updateLabels();
+    }
+
+    function pointerPos(evt) {
+      const r = canvas.getBoundingClientRect();
+      return P(evt.clientX - r.left, evt.clientY - r.top);
+    }
+
+    function nearestVP(pos) {
+      const mode = Number(controls.mode.value);
+      const points = [state.vp1, state.vp2, state.vp3].filter((_, i) => i < mode);
+      let best = null;
+      let bestDist = Infinity;
+      for (const p of points) {
+        const d = Math.hypot(pos.x - p.x, pos.y - p.y);
+        if (d < bestDist) { best = p; bestDist = d; }
+      }
+      return bestDist < 24 ? best : null;
+    }
+
+    canvas.addEventListener('pointerdown', (evt) => {
+      const hit = nearestVP(pointerPos(evt));
+      if (!hit) return;
+      state.dragging = hit;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(evt.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', (evt) => {
+      if (!state.dragging) return;
+      const pos = pointerPos(evt);
+      if (state.dragging === state.vp1) {
+        controls.vp1x.value = Math.round(pos.x);
+        controls.horizon.value = Math.round(pos.y);
+      } else if (state.dragging === state.vp2) {
+        controls.vp2x.value = Math.round(pos.x);
+        controls.horizon.value = Math.round(pos.y);
+      } else if (state.dragging === state.vp3) {
+        controls.vp3y.value = Math.round(pos.y);
+      }
+      draw();
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      state.dragging = null;
+      canvas.style.cursor = 'grab';
+    });
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(canvas.clientWidth * dpr);
+      canvas.height = Math.floor(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    Object.values(controls).forEach((el) => {
+      el.addEventListener('input', () => {
+        if (el.id === 'preset' && el.value !== 'free') applyPreset(el.value);
+        else draw();
+      });
+      el.addEventListener('change', draw);
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+  </script>
+</body>
+</html>
