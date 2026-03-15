@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Интерактивная перспектива: точки схода</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #151c34;
+      --ink: #e9eefb;
+      --accent: #7dd3fc;
+      --accent2: #a78bfa;
+      --danger: #fb7185;
+      --good: #34d399;
+      --line: #40507a;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(circle at 20% 0%, #16203d, var(--bg) 50%);
+      color: var(--ink);
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, #1a2343, var(--panel));
+      border-right: 1px solid #2f3b64;
+      padding: 18px;
+      overflow-y: auto;
+      max-height: 100vh;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+      line-height: 1.25;
+    }
+
+    p { margin: 10px 0; opacity: 0.92; }
+
+    .group {
+      margin: 14px 0;
+      border: 1px solid #32406a;
+      border-radius: 10px;
+      padding: 10px;
+      background: #10172d;
+    }
+
+    .group h2 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      color: #c4d3ff;
+      letter-spacing: 0.02em;
+    }
+
+    .control {
+      margin: 8px 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      align-items: center;
+      font-size: 0.9rem;
+    }
+
+    .control input[type="range"] {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+
+    .checks {
+      display: grid;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid #425386;
+      background: #162245;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100vh;
+      display: block;
+      background: linear-gradient(180deg, #1f2a4f 0%, #111833 65%, #0d1228 100%);
+      cursor: grab;
+    }
+
+    .hint {
+      font-size: 0.84rem;
+      opacity: 0.8;
+      line-height: 1.3;
+    }
+
+    .legend {
+      font-size: 0.83rem;
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 6px;
+      transform: translateY(1px);
+    }
+  </style>
+</head>
+<body>
+  <aside class="panel">
+    <h1>Интерактивный учебник по перспективе</h1>
+    <p>Двигай ползунки и точки схода (перетаскивай мышью на холсте), чтобы увидеть, как меняется объём.</p>
+
+    <div class="badge">🎯 ЛКМ + drag: двигать точку схода</div>
+
+    <div class="group">
+      <h2>Режим</h2>
+      <div class="control">
+        <label for="mode">Количество точек схода</label>
+        <span id="modeValue">2</span>
+        <input id="mode" type="range" min="1" max="3" value="2" step="1" />
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Положение линии горизонта и камеры</h2>
+      <div class="control">
+        <label for="horizon">Высота горизонта</label>
+        <span id="horizonValue"></span>
+        <input id="horizon" type="range" min="80" max="900" value="360" />
+      </div>
+      <div class="control">
+        <label for="eyeHeight">Высота объекта относительно горизонта</label>
+        <span id="eyeHeightValue"></span>
+        <input id="eyeHeight" type="range" min="-220" max="220" value="0" />
+      </div>
+      <div class="control">
+        <label for="boxDepth">Глубина объёма</label>
+        <span id="boxDepthValue"></span>
+        <input id="boxDepth" type="range" min="0.18" max="0.9" value="0.55" step="0.01" />
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Положение точек схода</h2>
+      <div class="control">
+        <label for="vp1x">VP1 X</label>
+        <span id="vp1xValue"></span>
+        <input id="vp1x" type="range" min="-800" max="2600" value="80" />
+      </div>
+      <div class="control">
+        <label for="vp2x">VP2 X</label>
+        <span id="vp2xValue"></span>
+        <input id="vp2x" type="range" min="-800" max="2600" value="1440" />
+      </div>
+      <div class="control">
+        <label for="vp3y">VP3 Y (для 3-точечной)</label>
+        <span id="vp3yValue"></span>
+        <input id="vp3y" type="range" min="-1200" max="1800" value="-500" />
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Отображение</h2>
+      <div class="checks">
+        <label><input id="showGrid" type="checkbox" checked /> Сетка в перспективе</label>
+        <label><input id="showRays" type="checkbox" checked /> Лучи от точек схода</label>
+        <label><input id="showTips" type="checkbox" checked /> Подсказки</label>
+      </div>
+      <div class="legend">
+        <div><span class="swatch" style="background:#7dd3fc"></span>Линии к VP1</div>
+        <div><span class="swatch" style="background:#a78bfa"></span>Линии к VP2</div>
+        <div><span class="swatch" style="background:#fb7185"></span>Вертикали / VP3</div>
+      </div>
+    </div>
+
+    <p class="hint">Подсказка: если точки схода очень близко друг к другу, перспектива становится «широкоугольной» и искажённой. Если далеко — более спокойной.</p>
+  </aside>
+
+  <canvas id="scene"></canvas>
+
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+
+    const controls = {
+      mode: document.getElementById('mode'),
+      horizon: document.getElementById('horizon'),
+      eyeHeight: document.getElementById('eyeHeight'),
+      boxDepth: document.getElementById('boxDepth'),
+      vp1x: document.getElementById('vp1x'),
+      vp2x: document.getElementById('vp2x'),
+      vp3y: document.getElementById('vp3y'),
+      showGrid: document.getElementById('showGrid'),
+      showRays: document.getElementById('showRays'),
+      showTips: document.getElementById('showTips')
+    };
+
+    const labels = {
+      modeValue: document.getElementById('modeValue'),
+      horizonValue: document.getElementById('horizonValue'),
+      eyeHeightValue: document.getElementById('eyeHeightValue'),
+      boxDepthValue: document.getElementById('boxDepthValue'),
+      vp1xValue: document.getElementById('vp1xValue'),
+      vp2xValue: document.getElementById('vp2xValue'),
+      vp3yValue: document.getElementById('vp3yValue')
+    };
+
+    const state = {
+      vp1: { x: 80, y: 360, color: '#7dd3fc', name: 'VP1' },
+      vp2: { x: 1440, y: 360, color: '#a78bfa', name: 'VP2' },
+      vp3: { x: 760, y: -500, color: '#fb7185', name: 'VP3' },
+      dragPoint: null
+    };
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(canvas.clientWidth * dpr);
+      canvas.height = Math.floor(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    function lineIntersection(a, b, c, d) {
+      const x1 = a.x, y1 = a.y, x2 = b.x, y2 = b.y;
+      const x3 = c.x, y3 = c.y, x4 = d.x, y4 = d.y;
+      const den = (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+      if (Math.abs(den) < 1e-7) return null;
+      const px = ((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/den;
+      const py = ((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/den;
+      return { x: px, y: py };
+    }
+
+    function pointAtTowards(p, target, t) {
+      return {
+        x: p.x + (target.x - p.x) * t,
+        y: p.y + (target.y - p.y) * t
+      };
+    }
+
+    function drawLine(p1, p2, color, width = 1, alpha = 1, dash = []) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = width;
+      ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawPoint(p, r, color, text) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.fillText(text, p.x + 10, p.y - 10);
+      ctx.restore();
+    }
+
+    function makeBox() {
+      const mode = Number(controls.mode.value);
+      const center = {
+        x: canvas.clientWidth * 0.5,
+        y: Number(controls.horizon.value) + Number(controls.eyeHeight.value)
+      };
+
+      const h = 180;
+      const vTop = mode === 3
+        ? pointAtTowards(center, state.vp3, 0.28)
+        : { x: center.x, y: center.y - h * 0.5 };
+      const vBottom = mode === 3
+        ? pointAtTowards(center, state.vp3, -0.28)
+        : { x: center.x, y: center.y + h * 0.5 };
+
+      const depth = Number(controls.boxDepth.value);
+
+      const topTo1 = pointAtTowards(vTop, state.vp1, depth);
+      const topTo2 = pointAtTowards(vTop, state.vp2, depth);
+      const bottomTo1 = pointAtTowards(vBottom, state.vp1, depth);
+      const bottomTo2 = pointAtTowards(vBottom, state.vp2, depth);
+
+      const backTop = lineIntersection(topTo1, state.vp2, topTo2, state.vp1);
+      const backBottom = lineIntersection(bottomTo1, state.vp2, bottomTo2, state.vp1);
+
+      const rightFront = lineIntersection(topTo1, state.vp3, bottomTo1, state.vp3) || {
+        x: (topTo1.x + bottomTo1.x) * 0.5,
+        y: (topTo1.y + bottomTo1.y) * 0.5
+      };
+      const leftFront = lineIntersection(topTo2, state.vp3, bottomTo2, state.vp3) || {
+        x: (topTo2.x + bottomTo2.x) * 0.5,
+        y: (topTo2.y + bottomTo2.y) * 0.5
+      };
+
+      const rightBackTop = lineIntersection(backTop, state.vp1, topTo1, state.vp3) || pointAtTowards(backTop, state.vp3, 0.3);
+      const rightBackBottom = lineIntersection(backBottom, state.vp1, bottomTo1, state.vp3) || pointAtTowards(backBottom, state.vp3, 0.3);
+      const leftBackTop = lineIntersection(backTop, state.vp2, topTo2, state.vp3) || pointAtTowards(backTop, state.vp3, 0.3);
+      const leftBackBottom = lineIntersection(backBottom, state.vp2, bottomTo2, state.vp3) || pointAtTowards(backBottom, state.vp3, 0.3);
+
+      return {
+        mode,
+        center,
+        vTop,
+        vBottom,
+        topTo1,
+        topTo2,
+        bottomTo1,
+        bottomTo2,
+        backTop,
+        backBottom,
+        rightFront,
+        leftFront,
+        rightBackTop,
+        rightBackBottom,
+        leftBackTop,
+        leftBackBottom
+      };
+    }
+
+    function drawPerspectiveGrid() {
+      if (!controls.showGrid.checked) return;
+      const horizon = Number(controls.horizon.value);
+      ctx.save();
+      ctx.strokeStyle = '#40507a';
+      ctx.globalAlpha = 0.25;
+      ctx.lineWidth = 1;
+      for (let y = horizon - 260; y <= horizon + 260; y += 26) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.clientWidth, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      const anchor = { x: canvas.clientWidth * 0.5, y: horizon + 140 };
+      for (let i = -9; i <= 9; i++) {
+        const step = i * 42;
+        drawLine({ x: anchor.x + step, y: anchor.y }, state.vp1, '#7dd3fc', 1, 0.18);
+        drawLine({ x: anchor.x + step, y: anchor.y }, state.vp2, '#a78bfa', 1, 0.18);
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+      state.vp1.y = Number(controls.horizon.value);
+      state.vp2.y = Number(controls.horizon.value);
+      state.vp1.x = Number(controls.vp1x.value);
+      state.vp2.x = Number(controls.vp2x.value);
+      state.vp3.y = Number(controls.vp3y.value);
+      state.vp3.x = canvas.clientWidth * 0.5;
+
+      drawPerspectiveGrid();
+
+      drawLine({ x: 0, y: state.vp1.y }, { x: canvas.clientWidth, y: state.vp1.y }, '#8aa1de', 2, 0.55, [8, 8]);
+
+      const box = makeBox();
+
+      if (controls.showRays.checked) {
+        const edges = [
+          box.vTop, box.vBottom, box.topTo1, box.topTo2,
+          box.bottomTo1, box.bottomTo2, box.backTop, box.backBottom
+        ];
+        for (const p of edges) {
+          drawLine(p, state.vp1, '#7dd3fc', 1, 0.2);
+          drawLine(p, state.vp2, '#a78bfa', 1, 0.2);
+          if (box.mode === 3) drawLine(p, state.vp3, '#fb7185', 1, 0.2);
+        }
+      }
+
+      drawLine(box.vTop, box.topTo1, '#7dd3fc', 2);
+      drawLine(box.vTop, box.topTo2, '#a78bfa', 2);
+      drawLine(box.vBottom, box.bottomTo1, '#7dd3fc', 2);
+      drawLine(box.vBottom, box.bottomTo2, '#a78bfa', 2);
+
+      drawLine(box.topTo1, box.backTop, '#a78bfa', 2);
+      drawLine(box.topTo2, box.backTop, '#7dd3fc', 2);
+      drawLine(box.bottomTo1, box.backBottom, '#a78bfa', 2);
+      drawLine(box.bottomTo2, box.backBottom, '#7dd3fc', 2);
+
+      if (box.mode === 3) {
+        drawLine(box.vTop, box.vBottom, '#fb7185', 2.3);
+        drawLine(box.topTo1, box.bottomTo1, '#fb7185', 2);
+        drawLine(box.topTo2, box.bottomTo2, '#fb7185', 2);
+        drawLine(box.backTop, box.backBottom, '#fb7185', 2);
+      } else {
+        drawLine(box.vTop, box.vBottom, '#fb7185', 2.3);
+        drawLine(box.topTo1, box.bottomTo1, '#fb7185', 2);
+        drawLine(box.topTo2, box.bottomTo2, '#fb7185', 2);
+        drawLine(box.backTop, box.backBottom, '#fb7185', 2);
+      }
+
+      drawPoint(state.vp1, 6, state.vp1.color, state.vp1.name);
+      if (box.mode >= 2) drawPoint(state.vp2, 6, state.vp2.color, state.vp2.name);
+      if (box.mode === 3) drawPoint(state.vp3, 6, state.vp3.color, state.vp3.name);
+
+      if (controls.showTips.checked) {
+        ctx.save();
+        ctx.fillStyle = '#d7e5ff';
+        ctx.globalAlpha = 0.9;
+        ctx.font = '14px Inter, sans-serif';
+        const dist = Math.abs(state.vp2.x - state.vp1.x);
+        let msg = 'Сбалансированная перспектива';
+        if (dist < 600) msg = 'Сильное искажение: точки схода слишком близко';
+        if (dist > 1800) msg = 'Спокойная перспектива: точки схода далеко';
+        ctx.fillText(`Режим: ${box.mode}-точечная перспектива`, 18, 28);
+        ctx.fillText(msg, 18, 50);
+        ctx.fillText(`Горизонт = уровень глаз наблюдателя`, 18, 72);
+        if (box.mode === 3) ctx.fillText(`VP3 управляет наклоном вертикалей`, 18, 94);
+        ctx.restore();
+      }
+
+      updateLabels();
+    }
+
+    function updateLabels() {
+      labels.modeValue.textContent = controls.mode.value;
+      labels.horizonValue.textContent = `${controls.horizon.value}px`;
+      labels.eyeHeightValue.textContent = `${controls.eyeHeight.value}px`;
+      labels.boxDepthValue.textContent = controls.boxDepth.value;
+      labels.vp1xValue.textContent = `${controls.vp1x.value}px`;
+      labels.vp2xValue.textContent = `${controls.vp2x.value}px`;
+      labels.vp3yValue.textContent = `${controls.vp3y.value}px`;
+    }
+
+    Object.values(controls).forEach((el) => {
+      el.addEventListener('input', draw);
+      el.addEventListener('change', draw);
+    });
+
+    function nearestVP(pos) {
+      const points = [state.vp1, state.vp2, state.vp3];
+      const mode = Number(controls.mode.value);
+      const enabled = points.filter((_, i) => i < mode);
+      let best = null;
+      let bestD = Infinity;
+      for (const p of enabled) {
+        const d = Math.hypot(pos.x - p.x, pos.y - p.y);
+        if (d < bestD) {
+          bestD = d;
+          best = p;
+        }
+      }
+      return bestD < 22 ? best : null;
+    }
+
+    function pointerPos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+    }
+
+    canvas.addEventListener('pointerdown', (evt) => {
+      const p = pointerPos(evt);
+      const hit = nearestVP(p);
+      if (hit) {
+        canvas.setPointerCapture(evt.pointerId);
+        state.dragPoint = hit;
+        canvas.style.cursor = 'grabbing';
+      }
+    });
+
+    canvas.addEventListener('pointermove', (evt) => {
+      if (!state.dragPoint) return;
+      const p = pointerPos(evt);
+      if (state.dragPoint === state.vp1) controls.vp1x.value = Math.round(p.x);
+      if (state.dragPoint === state.vp2) controls.vp2x.value = Math.round(p.x);
+      if (state.dragPoint === state.vp3) controls.vp3y.value = Math.round(p.y);
+      if (state.dragPoint === state.vp1 || state.dragPoint === state.vp2) {
+        controls.horizon.value = Math.round(p.y);
+      }
+      draw();
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      state.dragPoint = null;
+      canvas.style.cursor = 'grab';
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+  </script>
+</body>
+</html>
